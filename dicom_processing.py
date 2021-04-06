@@ -1,3 +1,4 @@
+from pickle import TRUE
 import pydicom as dicom
 import skimage.exposure as exp
 import skimage.filters as filt
@@ -7,7 +8,7 @@ import numpy as np
 import os
 
 
-def png_loader(path) -> np.np.ndarray:
+def png_loader(path) -> np.ndarray:
     '''
     Loads a png image and returns a numpy array of the pixel data.
     :param path: path of the image
@@ -30,8 +31,6 @@ def pil_loader(path) -> PIL.Image:
     return img
 
 
-
-
 def dicom_loader(path, auto_load_png=True, raw=True) -> np.ndarray:
     '''
     Loads the dicom and does some simple pre-processing, returning a numpy array. Pre-processing is inverting MONOCHROME1
@@ -45,7 +44,7 @@ def dicom_loader(path, auto_load_png=True, raw=True) -> np.ndarray:
 
     if auto_load_png:
         extension = os.path.splitext(path)[1]
-
+        # if its a png image then just return the image
         if extension.lower() == '.png':
             return png_loader(path)
 
@@ -94,9 +93,6 @@ def dicom_loader(path, auto_load_png=True, raw=True) -> np.ndarray:
         Intercept = dc['00281052'].value
         Slope = dc['00281053'].value
 
-        print(path)
-        print(WC, WW, Intercept, Slope)
-
         vals = vals * Slope + Intercept
 
         lowestVisibleValue = (WC - 0.5 - ((WW - 1) / 2))
@@ -107,7 +103,6 @@ def dicom_loader(path, auto_load_png=True, raw=True) -> np.ndarray:
 
         vals = ((vals - (WC - 0.5)) / ((WW - 1) + 0.5)*255)+127.5
 
-        print(np.min(vals), np.max(vals))
 
         vals[lessthan] = 0
         vals[morethan] = 255
@@ -303,11 +298,23 @@ def to_stacked_sato_and_basic(input, destination_file_name=None, dicom_loader_fu
         PIL.Image.fromarray(out, 'RGB').save(destination_file_name)
         return True
 
+def auto_loader(filename, default_dicom_processor=to_sato_1):
+    '''
+    a function that returns a numpy array, filename can be '.png' or dicom file. if A dicom file, the default dicom processor is
+    applied to the image before it is returned.
+    '''
+
+    img = dicom_loader(filename, auto_load_png=True, raw=True)
+    extension = os.path.splitext(filename)[1]   
+        # if its a png image then just return the image
+    if extension.lower() == '.png' or default_dicom_processor is None:
+        return img
+    else:
+        return default_dicom_processor(img)
 
 
 if __name__ == '__main__':
-    pass
-
+    d = dicom_loader(r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\SATO1\NG_OK\000FAB2ACB5D3BB740E6683BDE287D423D8BEA41CC76B348B3880DD1894CC218.dcm.png')
 
 
 

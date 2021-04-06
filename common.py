@@ -21,6 +21,12 @@ USE_CUDA = True
 SATO_IMAGES_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\SATO1'
 NG_ROI_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\ROIS\NG_ROI'
 HILAR_POINT_ROI_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\ROIS\HILAR_POINTS_ROI'
+TRAIN_DF_PATH = r'datasets\train.df'
+VALIDATE_DF_PATH = r'datasets\validate.df'
+
+
+TRAIN_VALIDATE_SPLIT = 0.8
+
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() and USE_CUDA else 'cpu')
 

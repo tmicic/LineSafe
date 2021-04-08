@@ -18,6 +18,17 @@ SUPPRESS_WARNINGS = True
 NUMBER_OF_WORKERS = 4
 USE_CUDA = True
 
+TRAIN_BATCH_SIZE = 16
+VALIDATE_BATCH_SIZE = 16
+
+LR = 0.06
+TRAIN_EPOCHS = 1
+
+
+TRAIN_SHUFFLE = True
+VALIDATE_SHUFFLE = False
+
+
 SATO_IMAGES_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\SATO1'
 NG_ROI_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\ROIS\NG_ROI'
 HILAR_POINT_ROI_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAMMING\AI\data\ROIS\HILAR_POINTS_ROI'
@@ -46,7 +57,7 @@ def ensure_reproducibility(seed=None):
     torch.backends.cudnn.benchmark = False
     random.seed(seed)
     torch.cuda.manual_seed_all(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    #os.environ['PYTHONHASHSEED'] = str(seed)   << doesn't work with multiple workers for some reason. https://stackoverflow.com/questions/30585108/disable-hash-randomization-from-within-python-program
 
 def save_model_state(model, filename):
     torch.save(model.state_dict(), filename)
@@ -56,8 +67,6 @@ def load_model_state(model, filename):
     model.load_state_dict(torch.load(filename))
     model.eval()
     return model
-
-
 
 def pickle_object(obj, path, zip_file=True):
     if zip_file:

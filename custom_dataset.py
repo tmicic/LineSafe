@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Callable, Optional
 import torch
 import torchvision
@@ -84,6 +85,16 @@ class LineSafeDataset(VisionDataset):
         else:
             raise NotImplementedError()   
 
+    def get_class_ratios(self):
+        # returns the ratio of each class in the order of class_to_id
+        x = self.df.groupby('category')['hash'].nunique()
+
+        rs = torch.tensor([x[r] for r in self.class_to_id])
+
+        return rs / rs.sum()
+
+
+        
 
     def __len__(self) -> int:
         return len(self.df)
@@ -102,14 +113,13 @@ if __name__ == '__main__':
                         target_transform=transforms.Compose([
                             ToTensor()
                         ]),
-                        return_what='ng')
+                        return_what='all')
 
-    
-    dl = DataLoader(d, 4, True)
+    print(d.class_to_id)
+    print(d.get_class_ratios())
+    exit()
 
-    x,y,cat = next(iter(dl))
 
-    print(y.shape)
 
 
 

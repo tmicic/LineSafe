@@ -12,6 +12,7 @@ from contextlib import nullcontext
 import matplotlib.pyplot as plt
 import torch.optim as optim
 import os
+from metrics import Metrics
       
 
 if __name__ == '__main__':
@@ -53,12 +54,14 @@ if __name__ == '__main__':
     criterion = nn.NLLLoss(weight=train_dataset.get_class_ratios()).to(common.DEVICE) # incase of unbalanced datasets
 
     # load model
-    if MODEL_PATH != '':
+    if MODEL_PATH != 'resnet.model':
         if os.path.exists(MODEL_PATH):
             print(f'Loading model ({MODEL_PATH})...')
             model = common.load_model_state(model, MODEL_PATH)
         else:
             print(f'Model file does not exist.')
+
+    best_metrics = None     # stores the best metrics
 
 
     for epoch in range(0 if common.ALWAYS_VALIDATE_MODEL_FIRST else 1, common.TRAIN_EPOCHS + 1):    # do an epoch 0 if pre-val required
@@ -84,7 +87,7 @@ if __name__ == '__main__':
                 model.eval()
                 print('\tEvaluating:')
 
-            stats = {'count':0, 'positive_count':0, 'negative_count':0, 'true_positives':0, 'true_negatives':0, 'false_positives':0, 'false_negatives':0 }
+            current_metrics = Metrics()
 
             with context_manager:
                 
@@ -101,33 +104,42 @@ if __name__ == '__main__':
 
                     loss = criterion(output, y)
 
+                    total_loss += loss.item()                    
+                    
                     if training:
                         loss.backward()
                         optimizer.step()
 
-                    # sort out stats
-                    stats['count'] += len(X)
-                    stats['positive_count'] += (y==common.POSITIVE_CLASS).sum()
-                    stats['negative_count'] += (y!=common.POSITIVE_CLASS).sum()
-                    stats['true_positives'] += ((output.argmax(dim=1)==common.POSITIVE_CLASS) & (y==common.POSITIVE_CLASS)).sum()
-                    stats['true_negatives'] += ((output.argmax(dim=1)!=common.POSITIVE_CLASS) & (y!=common.POSITIVE_CLASS)).sum()
-                    stats['false_positives'] += ((output.argmax(dim=1)==common.POSITIVE_CLASS) & (y!=common.POSITIVE_CLASS)).sum()
-                    stats['false_negatives'] += ((output.argmax(dim=1)!=common.POSITIVE_CLASS) & (y==common.POSITIVE_CLASS)).sum()
-
-                    # calculations from https://en.wikipedia.org/wiki/Sensitivity_and_specificity - all as tensors
-                    false_positive_rate = stats['false_positives'] / stats['negative_count']
-                    false_negative_rate = stats['false_negatives'] / stats['positive_count']
-                    sensitivity = 1 - false_negative_rate
-                    specificity = 1 - false_positive_rate
-                    accuracy = (stats['true_positives'] + stats['true_negatives']) / stats['count']
-                    balananced_accuracy = (sensitivity + specificity) / 2 
+                    # update the stats
+                    current_metrics.update(
+                        count=len(X),
+                        positive_count=(y==common.POSITIVE_CLASS).sum().item(),
+                        true_positives=((output.argmax(dim=1)==common.POSITIVE_CLASS) & (y==common.POSITIVE_CLASS)).sum().item(),
+                        true_negatives=((output.argmax(dim=1)!=common.POSITIVE_CLASS) & (y!=common.POSITIVE_CLASS)).sum().item(),
+                        false_positives=((output.argmax(dim=1)==common.POSITIVE_CLASS) & (y!=common.POSITIVE_CLASS)).sum().item(),
+                        false_negatives=((output.argmax(dim=1)!=common.POSITIVE_CLASS) & (y==common.POSITIVE_CLASS)).sum().item(),
+                        loss=total_loss
+                    
+                    )
 
                     print(f'\r\tBatch: {i+1} of {len(dataloader)}: loss: {loss.item():.4f}', end='')
                     
-                    total_loss += loss.item()
+
 
             print()
-            print(f'\t Total loss: {total_loss:.4f}\t Sens: {sensitivity.item()*100:.2f}%\t Spec: {specificity.item()*100:.2f}%\t Acc: {accuracy.item()*100:.2f}%\t Bal Acc: {balananced_accuracy.item()*100:.2f}%')
+            print(f'\t Total loss: {total_loss:.4f}\t Sens: {current_metrics.sensitivity().item()*100:.2f}%\t Spec: {current_metrics.specificity().item()*100:.2f}%\t Acc: {current_metrics.accuracy().item()*100:.2f}%\t Bal Acc: {current_metrics.balananced_accuracy().item()*100:.2f}%')
+
+            if not training:
+                # update stats, save model
+                if best_metrics is None:
+                    best_metrics = current_metrics
+                else:
+                    if current_metrics >= best_metrics and epoch > 0:   # don't resave the model if its a pre-evaluation
+                        print(f'Current model ({current_metrics}) out-performed previous best model ({best_metrics}). Saving new model...')
+                        best_metrics = current_metrics
+                        common.save_model_state(model, MODEL_PATH)
+
+
 
 
 

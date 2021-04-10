@@ -1,3 +1,4 @@
+from collections import namedtuple
 import common
 import models
 import torch
@@ -45,8 +46,10 @@ if __name__ == '__main__':
     validate_dataloader = DataLoader(validate_dataset, common.VALIDATE_BATCH_SIZE, shuffle=common.VALIDATE_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     
     model = models.Resnet(out_features=3).to(common.DEVICE) # NG_OK, NG_NOT_OK, NO_NG
-    optimizer = optim.Adadelta(model.parameters(), lr=common.LR)
+    optimizer = optim.Adam(model.parameters(), lr=common.LR)
     criterion = nn.NLLLoss(weight=train_dataset.get_class_ratios()).to(common.DEVICE) # incase of unbalanced datasets
+
+
 
 
 
@@ -67,6 +70,8 @@ if __name__ == '__main__':
                 model.eval()
                 print('\tEvaluating:')
 
+            stats = {'count':0, 'positive_count':0, 'negative_count':0, 'true_positives':0, 'true_negatives':0, 'false_positives':0, 'false_negatives':0 }
+
             with context_manager:
                 
                 total_loss = 0.
@@ -86,12 +91,29 @@ if __name__ == '__main__':
                         loss.backward()
                         optimizer.step()
 
+                    # sort out stats
+                    stats['count'] += len(X)
+                    stats['positive_count'] += (y==common.POSITIVE_CLASS).sum()
+                    stats['negative_count'] += (y!=common.POSITIVE_CLASS).sum()
+                    stats['true_positives'] += ((output.argmax(dim=1)==common.POSITIVE_CLASS) & (y==common.POSITIVE_CLASS)).sum()
+                    stats['true_negatives'] += ((output.argmax(dim=1)!=common.POSITIVE_CLASS) & (y!=common.POSITIVE_CLASS)).sum()
+                    stats['false_positives'] += ((output.argmax(dim=1)==common.POSITIVE_CLASS) & (y!=common.POSITIVE_CLASS)).sum()
+                    stats['false_negatives'] += ((output.argmax(dim=1)!=common.POSITIVE_CLASS) & (y==common.POSITIVE_CLASS)).sum()
+
+                    # calculations from https://en.wikipedia.org/wiki/Sensitivity_and_specificity - all as tensors
+                    false_positive_rate = stats['false_positives'] / stats['negative_count']
+                    false_negative_rate = stats['false_negatives'] / stats['positive_count']
+                    sensitivity = 1 - false_negative_rate
+                    specificity = 1 - false_positive_rate
+                    accuracy = (stats['true_positives'] + stats['true_negatives']) / stats['count']
+                    balananced_accuracy = (sensitivity + specificity) / 2 
+
                     print(f'\r\tBatch: {i+1} of {len(dataloader)}: loss: {loss.item():.4f}', end='')
                     
                     total_loss += loss.item()
 
             print()
-            print(f'\t Total loss: {total_loss:.4f}')
+            print(f'\t Total loss: {total_loss:.4f}\t Sens: {sensitivity.item()*100:.2f}%\t Spec: {specificity.item()*100:.2f}%\t Acc: {accuracy.item()*100:.2f}%\t Bal Acc: {balananced_accuracy.item()*100:.2f}%')
 
 
 

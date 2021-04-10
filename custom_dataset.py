@@ -44,7 +44,7 @@ class LineSafeDataset(VisionDataset):
         del self.df['index']
 
 
-        self.classes = self.df['category'].unique()
+        self.classes = sorted(self.df['category'].unique())                 # make sure that training and validation set have same classes!!! in same order!!
         self.class_to_id = {x:i for i,x in enumerate(self.classes)}
 
         if self.return_what == 'all':

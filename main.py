@@ -4,7 +4,7 @@ import models
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from custom_dataset import LineSafeDataset
+from custom_dataset import UnbalancedSelfSupervisedRotationalDataset
 import dicom_processing
 import torchvision.transforms as transforms
 import custom_transforms 
@@ -14,7 +14,6 @@ import torch.optim as optim
 import os
 from metrics import Metrics
       
-
 if __name__ == '__main__':
 
     common.ensure_reproducibility(common.ENSURE_REPRODUCIBILITY)  
@@ -26,35 +25,30 @@ if __name__ == '__main__':
                                 transforms.Resize((256,256)),
                             ])
 
-    train_dataset = LineSafeDataset(common.TRAIN_DF_PATH, 
+    
+    train_dataset = UnbalancedSelfSupervisedRotationalDataset(common.TRAIN_DF_PATH, 
                             root=common.SATO_IMAGES_ROOT_PATH, 
-                            ng_roi_root=common.NG_ROI_ROOT_PATH,
                             loader=dicom_processing.auto_loader,
-                            target_loader=None,
                             transform=transform,
-                            target_transform=None,
-                            return_what='all')
+                            target_transform=None,)
 
-    validate_dataset = LineSafeDataset(common.VALIDATE_DF_PATH, 
+    validate_dataset = UnbalancedSelfSupervisedRotationalDataset(common.VALIDATE_DF_PATH, 
                             root=common.SATO_IMAGES_ROOT_PATH, 
-                            ng_roi_root=common.NG_ROI_ROOT_PATH,
                             loader=dicom_processing.auto_loader,
-                            target_loader=None,
                             transform=transform,
-                            target_transform=None,
-                            return_what='all')
+                            target_transform=None,)
 
     train_dataloader = DataLoader(train_dataset, common.TRAIN_BATCH_SIZE, shuffle=common.TRAIN_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     validate_dataloader = DataLoader(validate_dataset, common.VALIDATE_BATCH_SIZE, shuffle=common.VALIDATE_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     
-    MODEL_PATH = r'basic_resnet.model'
+    MODEL_PATH = r'basic_resnet_self_sup_rotation.model'
 
-    model = models.Resnet(out_features=3).to(common.DEVICE) # NG_OK, NG_NOT_OK, NO_NG
+    model = models.Resnet(out_features=4).to(common.DEVICE) # 0 = 0 deg, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg
     optimizer = optim.Adam(model.parameters(), lr=common.LR)
-    criterion = nn.NLLLoss(weight=train_dataset.get_class_ratios()).to(common.DEVICE) # incase of unbalanced datasets
+    criterion = nn.NLLLoss().to(common.DEVICE) # incase of unbalanced datasets
 
     # load model
-    if MODEL_PATH != 'resnet.model':
+    if MODEL_PATH != '':
         if os.path.exists(MODEL_PATH):
             print(f'Loading model ({MODEL_PATH})...')
             model = common.load_model_state(model, MODEL_PATH)
@@ -62,7 +56,6 @@ if __name__ == '__main__':
             print(f'Model file does not exist.')
 
     best_metrics = None     # stores the best metrics
-
 
     for epoch in range(0 if common.ALWAYS_VALIDATE_MODEL_FIRST else 1, common.TRAIN_EPOCHS + 1):    # do an epoch 0 if pre-val required
 
@@ -93,16 +86,20 @@ if __name__ == '__main__':
                 
                 total_loss = 0.
 
-                for i, (X, y) in enumerate(dataloader):
+                for i, (X, _, y, _) in enumerate(dataloader):
                     
                     X = X.to(common.DEVICE)
                     y = y.to(common.DEVICE)
+
 
                     if training: optimizer.zero_grad()
 
                     output = model(X)
 
                     loss = criterion(output, y)
+
+
+
 
                     total_loss += loss.item()                    
                     
@@ -127,7 +124,7 @@ if __name__ == '__main__':
 
 
             print()
-            print(f'\t Total loss: {total_loss:.4f}\t Sens: {current_metrics.sensitivity().item()*100:.2f}%\t Spec: {current_metrics.specificity().item()*100:.2f}%\t Acc: {current_metrics.accuracy().item()*100:.2f}%\t Bal Acc: {current_metrics.balananced_accuracy().item()*100:.2f}%')
+            print(f'\t Total loss: {total_loss:.4f}\t Acc: {current_metrics.accuracy().item()*100:.2f}%')
 
             if not training:
                 # update stats, save model

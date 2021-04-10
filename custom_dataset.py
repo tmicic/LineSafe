@@ -74,7 +74,7 @@ class UnbalancedSelfSupervisedRotationalDataset(UnbalancedDataset):
         X = self.loader(os.path.join(self.root, item['category'],item['filename']))
         if self.transform is not None: X = self.transform(X)
 
-        rot = torch.tensor(random.randint(0,4))
+        rot = torch.tensor(random.randint(0,3))
 
         y = X.rot90(k=rot.item(), dims=(1,2))
 

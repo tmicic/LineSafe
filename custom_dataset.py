@@ -76,13 +76,15 @@ class UnbalancedSelfSupervisedRotationalDataset(UnbalancedDataset):
 
         rot = torch.tensor(random.randint(0,3))
 
-        y = X.rot90(k=rot.item(), dims=(1,2))
+        if rot > 0:
+            y = X.rot90(k=rot.item(), dims=(1,2))
+        else:
+            y = X
 
         cat = torch.tensor(self.class_to_id[item['category']])
         
-        if self.target_transform is not None: y = self.target_transform(y)
 
-        return X, y, rot, cat
+        return y, X, rot, cat           # rotated image is now X, X is the label rot
 
 class UnetDataset(UnbalancedDataset):
 
@@ -137,35 +139,27 @@ class UnetDataset(UnbalancedDataset):
 
 if __name__ == '__main__':
     print('debugging')
-    d = UnetDataset(common.TRAIN_DF_PATH, 
-                        root=common.SATO_IMAGES_ROOT_PATH, 
-                        map_root=common.NG_ROI_ROOT_PATH,
-                        loader=dicom_processing.auto_loader,
-                        transform=transforms.Compose([
-                            ToTensor()
-                        ]),
-                        target_transform=transforms.Compose([
-                            ToTensor()
-                        ])
-                        )
+    import custom_transforms
 
-    for r in range(0, 100):
-        x, y, cat = d.__getitem__(r)
+    transform = transforms.Compose([
+                                
+                                transforms.ToTensor(),
+                                custom_transforms.ToMultiChannel(3),
+                                transforms.Resize((256,256)),
+                            ])
 
-        print(x.shape)
-        print(y.shape)
-        print(cat)
-        print()
+    
+    train_dataset = UnbalancedSelfSupervisedRotationalDataset(common.TRAIN_DF_PATH, 
+                            root=common.SATO_IMAGES_ROOT_PATH, 
+                            loader=dicom_processing.auto_loader,
+                            transform=transform,
+                            target_transform=None,)
 
-        plt.subplot(1,2,1)
-        plt.imshow(x[0])
-        plt.subplot(1,2,2)
-        plt.imshow(y[0])
+    train_dataloader = DataLoader(train_dataset, common.TRAIN_BATCH_SIZE, shuffle=common.TRAIN_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
 
-        plt.show()
+    for i, (x,y,rot,cat) in enumerate(train_dataloader):
 
-
-
+        print(i)
 
 
 

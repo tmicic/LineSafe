@@ -35,6 +35,7 @@ HILAR_POINT_ROI_ROOT_PATH = r'C:\Users\Tom\Google Drive\Documents\PYTHON PROGRAM
 TRAIN_DF_PATH = r'datasets\train.df'
 VALIDATE_DF_PATH = r'datasets\validate.df'
 
+ALWAYS_VALIDATE_MODEL_FIRST = True
 
 TRAIN_VALIDATE_SPLIT = 0.8
 

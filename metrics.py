@@ -3,9 +3,10 @@ import warnings
 
 class Metrics:
 
-    def __init__(self, comparison_metric='accuracy') -> None:
+    def __init__(self, comparison_metric='accuracy', metric_is_percentage=True) -> None:
             
             self.comparison_metric = None
+            self.metric_is_percentage = metric_is_percentage    # if true, when printing to screen, will multiple metric by 100
 
             self.set_comparison_metric(comparison_metric)
             self.reset()
@@ -162,10 +163,10 @@ class Metrics:
         return self.markedness()
 
     def __str__(self) -> str:
-        return f'{self.comparison_metric}'
+        return f'{self.comparison_metric}: {self.get_metric_value().item() * (100 if self.metric_is_percentage else 1.):.4f}{("%" if self.metric_is_percentage else "")}'
 
     def __repr__(self) -> str:
-        pass
+        return self.__str__()
 
 
 if __name__ == '__main__':
@@ -176,13 +177,8 @@ if __name__ == '__main__':
     b = Metrics()
     b.update(29,4,2,1,4,1)
 
-    if b < m:
-        m = b
+    print(b)
 
-    
-
-
-    print(m.get_metric_value())
 
 
 

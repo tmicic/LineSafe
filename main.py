@@ -1,4 +1,3 @@
-from collections import namedtuple
 import common
 import models
 import torch
@@ -124,7 +123,10 @@ if __name__ == '__main__':
 
 
             print()
+            
+            if not training: print('---------------------------------------------------')
             print(f'\t Total loss: {total_loss:.4f}\t Acc: {current_metrics.accuracy().item()*100:.2f}%')
+            if not training: print('---------------------------------------------------')
 
             if not training:
                 # update stats, save model

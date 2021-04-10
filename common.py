@@ -38,6 +38,8 @@ VALIDATE_DF_PATH = r'datasets\validate.df'
 
 TRAIN_VALIDATE_SPLIT = 0.8
 
+POSITIVE_CLASS = 0          # NG_NOT_OK is the positive class
+
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() and USE_CUDA else 'cpu')
 

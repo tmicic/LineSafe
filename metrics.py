@@ -34,27 +34,28 @@ class Metrics:
         self.true_negatives = torch.tensor(0.)
         self.false_positives = torch.tensor(0.)
         self.false_negatives = torch.tensor(0.)
+        self.loss = None
 
     def __eq__(self, o: object) -> bool:
-        return self.get_metric_value() == o.get_metric_value()
+        return (self.get_metric_value() == o.get_metric_value()).item()
 
     def __ne__(self, o: object) -> bool:
-        return self.get_metric_value() != o.get_metric_value()
+        return (self.get_metric_value() != o.get_metric_value()).item()
 
     def __lt__(self, o: object) -> bool:
-        return self.get_metric_value() < o.get_metric_value()
+        return (self.get_metric_value() < o.get_metric_value()).item()
 
     def __gt__(self, o: object) -> bool:
-        return self.get_metric_value() > o.get_metric_value()
+        return (self.get_metric_value() > o.get_metric_value()).item()
 
     def __le__(self, o: object) -> bool:
-        return self.get_metric_value() <= o.get_metric_value()
+        return (self.get_metric_value() <= o.get_metric_value()).item()
 
     def __ge__(self, o: object) -> bool:
-        return self.get_metric_value() >= o.get_metric_value()
+        return (self.get_metric_value() >= o.get_metric_value()).item()
 
  
-    def update(self, count, positive_count, true_positives, true_negatives, false_positives, false_negatives):
+    def update(self, count, positive_count, true_positives, true_negatives, false_positives, false_negatives, loss=None):
 
         self.count += count
         self.positive_count += positive_count
@@ -62,6 +63,7 @@ class Metrics:
         self.true_negatives += true_negatives
         self.false_positives += false_positives
         self.false_negatives += false_negatives
+        self.loss = loss
 
         if true_negatives+true_positives+false_negatives+false_positives != count:
             warnings.warn('TN, TP, FP, FN do not sum to match count during a metrics update! Metrics will not be accurate!', RuntimeWarning)

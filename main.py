@@ -11,6 +11,7 @@ import custom_transforms
 from contextlib import nullcontext
 import matplotlib.pyplot as plt
 import torch.optim as optim
+import os
       
 
 if __name__ == '__main__':
@@ -45,21 +46,34 @@ if __name__ == '__main__':
     train_dataloader = DataLoader(train_dataset, common.TRAIN_BATCH_SIZE, shuffle=common.TRAIN_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     validate_dataloader = DataLoader(validate_dataset, common.VALIDATE_BATCH_SIZE, shuffle=common.VALIDATE_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     
+    MODEL_PATH = r'basic_resnet.model'
+
     model = models.Resnet(out_features=3).to(common.DEVICE) # NG_OK, NG_NOT_OK, NO_NG
     optimizer = optim.Adam(model.parameters(), lr=common.LR)
     criterion = nn.NLLLoss(weight=train_dataset.get_class_ratios()).to(common.DEVICE) # incase of unbalanced datasets
 
+    # load model
+    if MODEL_PATH != '':
+        if os.path.exists(MODEL_PATH):
+            print(f'Loading model ({MODEL_PATH})...')
+            model = common.load_model_state(model, MODEL_PATH)
+        else:
+            print(f'Model file does not exist.')
 
 
+    for epoch in range(0 if common.ALWAYS_VALIDATE_MODEL_FIRST else 1, common.TRAIN_EPOCHS + 1):    # do an epoch 0 if pre-val required
 
-
-
-    for epoch in range(1, common.TRAIN_EPOCHS + 1):
-
-        print(f'Epoch {epoch} of {common.TRAIN_EPOCHS}:')
+        if epoch > 0:
+            print(f'Epoch {epoch} of {common.TRAIN_EPOCHS}:')
+        else:
+            print(f'Pre-evaluating model...')
 
         for training, dataset, dataloader in [(True, train_dataset, train_dataloader), 
                                                 (False, validate_dataset, validate_dataloader)]:
+
+            if epoch == 0 and training:
+                # pre-eval therefore skip training
+                continue
 
             if training:
                 context_manager = nullcontext()

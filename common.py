@@ -22,7 +22,7 @@ TRAIN_BATCH_SIZE = 16
 VALIDATE_BATCH_SIZE = 32
 
 LR = 0.06
-TRAIN_EPOCHS = 4
+TRAIN_EPOCHS = 40
 
 
 TRAIN_SHUFFLE = True
@@ -118,6 +118,10 @@ def get_estimate_time_remaining(number_done, total_to_do):
         return datetime.timedelta(seconds=s)
 
 def format_time_delta(dt=None):
+
+
+
+
     '''
     formats a timedelta as hh:mm:ss
     :param dt: timedelta, float of seconds, or None. If none, string returned = 'Calculating...'
@@ -133,3 +137,43 @@ def format_time_delta(dt=None):
     hours, remainder = divmod(dt.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return '{:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds)
+
+if __name__ == '__main__':
+
+    import custom_dataset, torch
+    import torch.nn
+    import torchvision.transforms as transforms
+    from custom_dataset import UnetDataset
+    import dicom_processing
+    from torch.utils.data import DataLoader
+    import matplotlib.pyplot as plt
+
+
+    transform = transforms.Compose([
+                                
+                                transforms.ToTensor(),
+                                transforms.Resize((256,256)),
+                            ])
+
+    target_transform = transforms.Compose([  
+                                transforms.ToTensor(),
+                                transforms.Resize((256,256)),
+                            ])
+
+
+    train_dataset = UnetDataset(TRAIN_DF_PATH, 
+                            root=SATO_IMAGES_ROOT_PATH, 
+                            map_root=NG_ROI_ROOT_PATH,
+                            loader=dicom_processing.auto_loader,
+                            transform=transform,
+                            target_transform=target_transform,)
+
+    train_dataloader = DataLoader(train_dataset, TRAIN_BATCH_SIZE, shuffle=TRAIN_SHUFFLE, num_workers=NUMBER_OF_WORKERS)
+
+    X, y, cat = next(iter(train_dataloader))
+
+    plt.imshow(X[0,0])
+    plt.show()
+    
+
+    

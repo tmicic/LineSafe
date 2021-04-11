@@ -130,7 +130,66 @@ class UnetDataset(UnbalancedDataset):
 
         return X, y, cat
 
+class SiameseDataset(UnbalancedDataset):
 
+    def __init__(self, df_path: str, 
+                        root: str, 
+                        transform=None, 
+                        target_transform=None,
+                        loader=dicom_processing.auto_loader, 
+                        return_type='contrastive',   # or triplet
+                        ignore_no_tubes=True,
+                        ) -> None:
+        super().__init__(df_path, root, transform=transform, target_transform=target_transform, loader=loader)
+
+        self.ignore_no_tubes = ignore_no_tubes
+        self.return_type = return_type
+
+        if ignore_no_tubes:
+            self.df = self.df[self.df['category'] != 'NO_NG']
+
+    def __getitem__(self, index: int):
+        item = self.df.iloc[index]
+
+        X = self.loader(os.path.join(self.root, item['category'],item['filename']))
+        if self.transform is not None: X = self.transform(X)
+
+        cat_name = item['category']
+        cat = torch.tensor(self.class_to_id[cat_name])
+
+        if self.return_type == 'triplet':
+            # return X as anchor, Pos, Neg, cat
+
+            pos = self.df[self.df['category']==cat_name].sample(n=1).iloc[0]
+            neg = self.df[self.df['category']!=cat_name].sample(n=1).iloc[0]
+
+            pos_image = self.loader(os.path.join(self.root, pos['category'], pos['filename']))
+            neg_image = self.loader(os.path.join(self.root, neg['category'], neg['filename']))
+
+            if self.transform is not None:
+                pos_image = self.transform(pos_image)
+                neg_image = self.transform(neg_image)
+
+            return X, pos_image, neg_image, cat
+
+        elif self.return_type == 'contrastive':
+            # return X, Y, same/diff (0,1), cat of X
+            same_or_diff = torch.tensor(random.randint(0,1))
+
+            if same_or_diff == 0:   # same = 0
+                contrastive = self.df[self.df['category']==cat_name].sample(n=1).iloc[0]
+            else:                   # diff = 1
+                contrastive = self.df[self.df['category']!=cat_name].sample(n=1).iloc[0]
+
+            contrastive_image = self.loader(os.path.join(self.root, contrastive['category'], contrastive['filename']))
+
+            if self.transform is not None:
+                contrastive_image = self.transform(contrastive_image)
+            
+            return X, contrastive_image, same_or_diff, cat
+        
+        else:
+            raise NotImplementedError(f'Siamese Dataset has not implemented the return_type of {self.return_type}.')
 
 
 
@@ -149,18 +208,16 @@ if __name__ == '__main__':
                             ])
 
     
-    train_dataset = UnbalancedSelfSupervisedRotationalDataset(common.TRAIN_DF_PATH, 
+    train_dataset = SiameseDataset(common.TRAIN_DF_PATH, 
                             root=common.SATO_IMAGES_ROOT_PATH, 
                             loader=dicom_processing.auto_loader,
                             transform=transform,
-                            target_transform=None,)
+                            target_transform=None,
+                            ignore_no_tubes=True, 
+                            return_type='contrastive')
 
-    train_dataloader = DataLoader(train_dataset, common.TRAIN_BATCH_SIZE, shuffle=common.TRAIN_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
 
-    for i, (x,y,rot,cat) in enumerate(train_dataloader):
-
-        print(i)
-
+    train_dataset.__getitem__(0)
 
 
 

@@ -1,3 +1,5 @@
+from typing import OrderedDict
+from numpy.matrixlib import mat
 from custom_dataset import UnetDataset
 import torch
 import torch.nn as nn
@@ -128,11 +130,73 @@ class UNet(nn.Module):
         logits = self.outc(x)
         return logits
 
+class Siamese(nn.Module):
+
+    def __init__(self, embedding_size=512, siamese_type='triplet'):
+        super().__init__()
+
+        self.embedding_size = embedding_size
+        self.resnet_backend = Resnet(out_features=embedding_size)
+        self.siamese_type = siamese_type
+
+    def get_embedding(self, x):
+        return self.resnet_backend(x)
+
+    def forward(self, anchor, contrastive_or_positive, negative=None):
+        
+        if self.siamese_type == 'triplet':
+            return self.get_embedding(anchor), self.get_embedding(contrastive_or_positive), self.get_embedding(negative)
+        else:
+            return self.get_embedding(anchor), self.get_embedding(contrastive_or_positive)
+        
+class ContrastiveLoss(nn.Module):
+    """
+    Contrastive loss
+    Takes embeddings of two samples and a target label == 1 if samples are from the same class and label == 0 otherwise
+    """
+
+    def __init__(self, margin):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+        self.eps = 1e-9
+
+    def forward(self, output1, output2, target, size_average=True):
+        distances = (output2 - output1).pow(2).sum(1)  # squared distances
+        losses = 0.5 * (target.float() * distances +
+                        (1 + -1 * target).float() * F.relu(self.margin - (distances + self.eps).sqrt()).pow(2))
+        return losses.mean() if size_average else losses.sum()
+
+
+class TripletLoss(nn.Module):
+    """
+    Triplet loss
+    Takes embeddings of an anchor sample, a positive sample and a negative sample
+    """
+
+    def __init__(self, margin):
+        super(TripletLoss, self).__init__()
+        self.margin = margin
+
+    def forward(self, anchor, positive, negative, size_average=True):
+        distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
+        distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
+        losses = F.relu(distance_positive - distance_negative + self.margin)
+        return losses.mean() if size_average else losses.sum()
 
 
 if __name__ == '__main__':
     
-    model = UNet(1,1)
+    import common
+
+    model = Siamese()
+
+    model = common.lazy_load_model_state(model, 'basic_resnet_self_sup_rotation.model')
+
+    common.save_model_state(model, 'siamese.model')
+
+
+
+    
 
 
 

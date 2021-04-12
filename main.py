@@ -4,7 +4,7 @@ import models
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from custom_dataset import UnetDataset
+from custom_dataset import SiameseDataset, UnetDataset
 import dicom_processing
 import torchvision.transforms as transforms
 import custom_transforms 
@@ -23,6 +23,7 @@ if __name__ == '__main__':
                                 
                                 transforms.ToTensor(),
                                 transforms.Resize((256,256)),
+                                custom_transforms.ToMultiChannel(number_of_channels=3)
                             ])
 
     target_transform = transforms.Compose([  
@@ -31,28 +32,28 @@ if __name__ == '__main__':
                             ])
 
 
-    train_dataset = UnetDataset(common.TRAIN_DF_PATH, 
+    train_dataset = SiameseDataset(common.TRAIN_DF_PATH, 
                             root=common.SATO_IMAGES_ROOT_PATH, 
-                            map_root=common.NG_ROI_ROOT_PATH,
                             loader=dicom_processing.auto_loader,
                             transform=transform,
-                            target_transform=target_transform,)
+                            return_type='triplet',
+                            target_transform=None)
 
-    validate_dataset = UnetDataset(common.VALIDATE_DF_PATH, 
+    validate_dataset = SiameseDataset(common.VALIDATE_DF_PATH, 
                             root=common.SATO_IMAGES_ROOT_PATH, 
-                            map_root=common.NG_ROI_ROOT_PATH,
                             loader=dicom_processing.auto_loader,
                             transform=transform,
-                            target_transform=target_transform,)
+                            return_type='triplet',
+                            target_transform=None,)
 
     train_dataloader = DataLoader(train_dataset, common.TRAIN_BATCH_SIZE, shuffle=common.TRAIN_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     validate_dataloader = DataLoader(validate_dataset, common.VALIDATE_BATCH_SIZE, shuffle=common.VALIDATE_SHUFFLE, num_workers=common.NUMBER_OF_WORKERS)
     
-    MODEL_PATH = r'unet_256x256_sing_ch.model'
+    MODEL_PATH = r'siamese.model'
 
-    model = models.UNet(n_channels=1, n_classes=1).to(common.DEVICE) # 0 = 0 deg, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg
+    model = models.Siamese(embedding_size=512, siamese_type='triplet').to(common.DEVICE) # 0 = 0 deg, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg
     optimizer = optim.Adam(model.parameters(), lr=common.LR) # orig optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9) lr = 0.001
-    criterion = nn.BCEWithLogitsLoss().to(common.DEVICE) # if one channel else cross entropy
+    criterion = models.TripletLoss(margin=1.).to(common.DEVICE) # if one channel else cross entropy
 
     # load model
     if MODEL_PATH != '':
@@ -92,20 +93,18 @@ if __name__ == '__main__':
                 
                 total_loss = 0.
 
-                for i, (X, y, cat) in enumerate(dataloader):
+                for i, (anchor, positive, negative, _) in enumerate(dataloader):
                     
-                    X = X.to(common.DEVICE)
-                    y = y.to(common.DEVICE)
+                    anchor = anchor.to(common.DEVICE)
+                    positive = positive.to(common.DEVICE)
+                    negative = negative.to(common.DEVICE)
 
 
                     if training: optimizer.zero_grad()
 
-                    output = model(X)
+                    output_anchor, output_positive, output_negative = model(anchor, positive, negative)
 
-                    loss = criterion(output, y)
-
-
-
+                    loss = criterion(output_anchor, output_positive, output_negative)
 
                     total_loss += loss.item()                    
                     
@@ -124,8 +123,6 @@ if __name__ == '__main__':
 
             if not training:
 
-                # draw the last dataset
-                drawing.update_figure_unet(X.detach().cpu(), y.detach().cpu(), output.detach().cpu())
 
                 # update stats, save model
                 if best_loss is None:
@@ -136,7 +133,6 @@ if __name__ == '__main__':
                         best_loss = total_loss
                         common.save_model_state(model, MODEL_PATH)
 
-    drawing.prevent_figure_close()
 
 
 

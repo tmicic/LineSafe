@@ -10,6 +10,7 @@ import datetime
 import time
 import pickle
 import bz2
+from typing import OrderedDict
 
 DEBUG = True                        # if true, debug mode is on and things will be written to the screen
 REPRODUCIBILITY_SEED = 6000         # Holly's IQ used as seed to ensure reproducibility
@@ -66,10 +67,47 @@ def save_model_state(model, filename):
     torch.save(model.state_dict(), filename)
     return True
 
-def load_model_state(model, filename):
-    model.load_state_dict(torch.load(filename))
+def load_model_state(model, filename, strict=True):
+    model.load_state_dict(torch.load(filename), strict=strict)
     model.eval()
     return model
+
+def lazy_load_model_state(model, filename, fuzy_match=True):
+        # will ignore missing or additional layer names. Also, if size missmatch it will ignore! 
+        # if fuzzy_match, matches the end of the 
+
+        file_model_state_dict = torch.load(filename)
+        to_load_dict = OrderedDict()
+
+
+        model_state_dict = model.state_dict()
+
+        for key in file_model_state_dict:
+
+            if key in model_state_dict.keys():
+                # key exists
+                if file_model_state_dict[key].shape == model_state_dict[key].shape:
+                    # happy days it matches in name and shape, copy it over
+                    to_load_dict[key] = file_model_state_dict[key]
+                else:
+                    # doesnt match size, dont copy it over
+                    pass
+            else:
+                # doesnt exist, but check if we are doing fuzy
+                if fuzy_match:
+                    
+                    matching_keys = [k for k in model_state_dict.keys() if k.endswith(key)]
+
+                    for l in matching_keys:
+                        #match keys, again need to check size
+                        if file_model_state_dict[key].shape == model_state_dict[l].shape:
+                            to_load_dict[l] = file_model_state_dict[key]
+
+
+        model.load_state_dict(to_load_dict, strict=False)
+        model.eval()
+
+        return model
 
 def pickle_object(obj, path, zip_file=True):
     if zip_file:
@@ -174,6 +212,6 @@ if __name__ == '__main__':
 
     plt.imshow(X[0,0])
     plt.show()
-    
+
 
     

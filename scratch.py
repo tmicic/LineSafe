@@ -1,17 +1,14 @@
 import torch
-import timeit
+import common
+import models
 
-x = torch.randn((1,256,256))
+#filename = r'basic_resnet_self_sup_rotation.model'
+filename = r'unet_256x256_sing_ch.model'
 
+x = torch.load(filename)
 
+print(x['inc.double_conv.0.weight'].shape)
 
-starttime = timeit.default_timer()
-for d in range(160):
-    y = x.rot90(k=3, dims=(1,2))
-endtime = timeit.default_timer()
-
-
-print(endtime-starttime)
 
 
 
